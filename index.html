@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数字斗兽场 —— 团播吐槽现场</title>
+
+<!-- CDN 依赖：Tailwind CSS / 思源宋体 / Lucide 图标 -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+<script>
+  // Tailwind 自定义主题：血红 / 纸白 / 荧光绿 / 警示橙（高对比暗色系）
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:      '#0a0a0a',   // 墨黑底色
+          blood:    '#e11d48',   // 血红主色
+          blooddark:'#7f1d1d',   // 深红
+          paper:    '#f5f0e6',   // 纸张米白
+          neon:     '#4ade80',   // 荧光绿（数据讽刺用）
+          warn:     '#f59e0b',   // 警示橙
+        },
+        fontFamily: {
+          serif: ['"Noto Serif SC"', 'serif'],
+          sans:  ['"Noto Sans SC"', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  /* ===== 全局基础 ===== */
+  html { scroll-behavior: smooth; }
+  body { background: #0a0a0a; }
+
+  /* 纸张噪点质感（用 SVG 滤镜模拟颗粒） */
+  .paper-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.06'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* 版画风硬阴影（无模糊，纯偏移，木刻味道） */
+  .woodcut-shadow { box-shadow: 8px 8px 0 #e11d48; }
+  .woodcut-shadow-paper { box-shadow: 8px 8px 0 #0a0a0a; }
+  .woodcut-shadow-green { box-shadow: 8px 8px 0 #4ade80; }
+
+  /* 红色印章效果 */
+  .seal {
+    writing-mode: vertical-rl;
+    font-family: "Noto Serif SC", serif;
+    font-weight: 900;
+    color: #fff;
+    background: #e11d48;
+    border: 3px solid #e11d48;
+    outline: 2px solid rgba(225,29,72,.4);
+    padding: .9rem .45rem;
+    letter-spacing: .35em;
+    line-height: 1.15;
+    transform: rotate(3deg);
+    user-select: none;
+  }
+
+  /* 竖排装饰标语（民国报刊风） */
+  .vertical-slogan {
+    writing-mode: vertical-rl;
+    letter-spacing: .5em;
+    font-family: "Noto Serif SC", serif;
+  }
+
+  /* 滚动浮现动画（由 IntersectionObserver 触发） */
+  .reveal { opacity: 0; transform: translateY(42px); transition: opacity .8s ease, transform .8s ease; }
+  .reveal.on { opacity: 1; transform: translateY(0); }
+
+  /* 弹幕层 */
+  #danmaku-layer { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+  .danmaku {
+    position: absolute;
+    white-space: nowrap;
+    font-family: "Noto Sans SC", sans-serif;
+    font-size: 15px;
+    will-change: transform;
+    text-shadow: 0 0 6px rgba(0,0,0,.9);
+  }
+  @keyframes danmaku-move {
+    from { transform: translateX(100vw); }
+    to   { transform: translateX(-100%); }
+  }
+
+  /* 引用大字：文字描边空心效果 */
+  .quote-outline {
+    -webkit-text-stroke: 1.5px rgba(245,240,230,.85);
+    color: transparent;
+  }
+
+  /* 表格行 hover 反色 */
+  .versus-row:hover { background: rgba(225,29,72,.12); }
+
+  /* 滑块样式（血红色调） */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 10px;
+    border-radius: 0;
+    background: linear-gradient(90deg, #e11d48 var(--fill, 50%), #2a2a2a var(--fill, 50%));
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 28px; height: 28px;
+    background: #f5f0e6;
+    border: 4px solid #e11d48;
+    border-radius: 0;
+    transform: rotate(45deg);
+    cursor: grab;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 28px; height: 28px;
+    background: #f5f0e6;
+    border: 4px solid #e11d48;
+    border-radius: 0;
+    transform: rotate(45deg);
+    cursor: grab;
+  }
+
+  /* 顶部危险条纹（警示带） */
+  .hazard-stripes {
+    background: repeating-linear-gradient(
+      -45deg,
+      #e11d48 0, #e11d48 18px,
+      #0a0a0a 18px, #0a0a0a 36px
+    );
+  }
+
+  /* 标题选中文本的默认样式覆盖（保持暗色主题一致） */
+  ::selection { background: #e11d48; color: #fff; }
+
+  /* 滚动条美化 */
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #e11d48; border: 2px solid #0a0a0a; }
+</style>
+</head>
+
+<body class="bg-ink text-paper font-sans antialiased overflow-x-hidden">
+
+<!-- ================= 弹幕背景层（讽刺直播间氛围，纯装饰可穿透） ================= -->
+<div id="danmaku-layer" aria-hidden="true"></div>
+
+<!-- ================= 顶部警示条纹 ================= -->
+<div class="hazard-stripes h-3 w-full fixed top-0 left-0 z-50"></div>
+
+<!-- ================= 导航 ================= -->
+<nav class="fixed top-3 left-0 w-full z-40 backdrop-blur bg-ink/70 border-b border-paper/10">
+  <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+    <a href="#top" class="flex items-center gap-2 font-serif font-black text-lg tracking-widest">
+      <i data-lucide="landmark" class="w-5 h-5 text-blood"></i>
+      数字斗兽场<span class="text-blood">·</span><span class="text-sm font-sans font-light text-paper/50">吐槽特辑</span>
+    </a>
+    <div class="hidden md:flex items-center gap-6 text-sm text-paper/60">
+      <a href="#versus" class="hover:text-blood transition-colors">世纪之问</a>
+      <a href="#luxun" class="hover:text-blood transition-colors">先生早说过了</a>
+      <a href="#gallery" class="hover:text-blood transition-colors">酷刑图鉴</a>
+      <a href="#test" class="hover:text-blood transition-colors">自愿检测</a>
+    </div>
+    <!-- 在线人数（讽刺数据，JS 模拟波动） -->
+    <div class="flex items-center gap-2 text-xs font-mono">
+      <span class="w-2 h-2 bg-neon rounded-full animate-pulse"></span>
+      <span class="text-neon"><span id="online-count">12,847</span></span>
+      <span class="text-paper/40 hidden sm:inline">位看客在线</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header id="top" class="relative min-h-screen flex flex-col justify-center items-center pt-24 pb-16 px-6">
+
+  <!-- 竖排装饰标语（左右两列，民国报刊风） -->
+  <div class="vertical-slogan absolute left-6 top-32 text-paper/25 text-xl font-serif hidden lg:block select-none">和平年间 · 无硝烟之酷刑</div>
+  <div class="vertical-slogan absolute right-6 top-44 text-paper/25 text-xl font-serif hidden lg:block select-none">自愿参加 · 强制快乐</div>
+
+  <div class="relative z-10 text-center max-w-5xl">
+    <!-- 眉题 -->
+    <p class="reveal font-sans text-xs md:text-sm tracking-[0.5em] text-warn uppercase mb-6">
+      本页面含有大量主观情绪 · 请舒适地愤怒
+    </p>
+
+    <!-- 主标题 -->
+    <h1 class="reveal font-serif font-black leading-none">
+      <span class="block text-5xl md:text-8xl tracking-wider">数字</span>
+      <span class="block text-7xl md:text-[11rem] text-blood tracking-widest woodcut-shadow mt-2 bg-ink py-2 px-4 inline-block">斗兽场</span>
+    </h1>
+
+    <!-- 副标题 -->
+    <p class="reveal font-serif text-lg md:text-2xl text-paper/80 mt-10 tracking-[0.2em]">
+      团播 · 强制营业 · 现代看客图鉴
+    </p>
+
+    <!-- 核心引言 -->
+    <blockquote class="reveal mt-12 border-l-4 border-blood pl-6 text-left max-w-2xl mx-auto">
+      <p class="font-serif text-base md:text-xl leading-loose text-paper/75">
+        和古罗马斗兽场相比，如今的区别只有：看台换成了手机屏幕，门票换成了流量，
+        角斗士换成了拿底薪的你——而那句<span class="text-blood font-bold">"他们是自愿的"</span>，
+        两千年了，还是同一个配方。
+      </p>
+    </blockquote>
+
+    <!-- 双印章 -->
+    <div class="reveal mt-12 flex items-end justify-center gap-6">
+      <div class="seal text-lg">吐槽专用</div>
+      <div class="seal text-sm bg-transparent text-blood" style="outline-color:rgba(225,29,72,.25)">字字真心</div>
+    </div>
+  </div>
+
+  <!-- 向下滚动提示 -->
+  <a href="#versus" class="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-paper/40 hover:text-blood transition-colors z-10">
+    <span class="text-xs tracking-[0.4em]">入场请下行</span>
+    <i data-lucide="chevrons-down" class="w-5 h-5 animate-bounce"></i>
+  </a>
+</header>
+
+<!-- ================= 世纪之问：斗兽场 VS 直播间 ================= -->
+<section id="versus" class="relative py-28 px-6">
+  <div class="max-w-5xl mx-auto">
+
+    <!-- 章节标题 -->
+    <div class="reveal flex items-center gap-4 mb-16">
+      <span class="font-serif font-black text-6xl md:text-8xl text-paper/10 leading-none select-none">壹</span>
+      <div>
+        <p class="text-blood font-mono text-sm tracking-widest mb-2">CHAPTER 01 · THE QUESTION</p>
+        <h2 class="font-serif font-black text-3xl md:text-5xl tracking-wider">世纪之问</h2>
+      </div>
+    </div>
+
+    <!-- 问题本身 -->
+    <div class="reveal bg-paper text-ink p-8 md:p-12 woodcut-shadow paper-grain mb-16 relative">
+      <p class="font-serif text-xl md:text-3xl font-bold leading-relaxed">
+        "团播这种东西，和以前古罗马斗兽场看奴隶受苦，<br class="hidden md:block">
+        区别<span class="text-blood">是什么？</span>"
+      </p>
+      <p class="font-sans text-ink/60 mt-6 text-sm md:text-base">
+        ——某位不愿透露姓名、刚被拉去参加四小时团建直播的打工人
+      </p>
+      <!-- 角落小印章 -->
+      <div class="seal absolute -top-5 -right-4 text-xs bg-ink border-ink">有此一问</div>
+    </div>
+
+    <!-- 对比表 -->
+    <div class="reveal border-2 border-paper/20">
+      <!-- 表头 -->
+      <div class="grid grid-cols-[1fr_auto_1fr] bg-blood text-white font-serif font-black text-center">
+        <div class="py-4 px-4 text-sm md:text-lg tracking-widest">古罗马斗兽场</div>
+        <div class="py-4 px-2 bg-ink text-blood flex items-center justify-center font-mono font-bold text-xs md:text-sm">VS</div>
+        <div class="py-4 px-4 text-sm md:text-lg tracking-widest">现代直播间</div>
+      </div>
+
+      <!-- 逐行对照（versus-row 提供 hover 反色） -->
+      <div class="divide-y divide-paper/10 font-serif">
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">角斗士，卖命</div>
+          <i data-lucide="swords" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">主播，卖笑</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">看台五万人起哄</div>
+          <i data-lucide="message-circle" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">弹幕五万条"哈哈哈"</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">皇帝扔面包</div>
+          <i data-lucide="gift" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">大哥刷火箭</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">拇指决定生死</div>
+          <i data-lucide="thumbs-up" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">点赞决定流量</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">放狮子老虎</div>
+          <i data-lucide="zap" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">输了吃芥末 / 淋冰水</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">"为了荣耀"</div>
+          <i data-lucide="megaphone" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">"为了家人们点点关注"</div>
+        </div>
+        <div class="versus-row grid grid-cols-[1fr_auto_1fr] items-center transition-colors">
+          <div class="p-4 md:p-5 text-right text-sm md:text-base text-paper/70">奴隶制，明码标价</div>
+          <i data-lucide="file-signature" class="w-4 h-4 text-blood/60 mx-2"></i>
+          <div class="p-4 md:p-5 text-sm md:text-base font-bold">签约制，"自愿"的那种</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 结论 -->
+    <p class="reveal mt-10 text-center font-serif text-lg md:text-2xl text-paper/80">
+      不能说毫无区别，只能说<span class="text-blood font-black">一模一样</span>——还更方便了，罗马人好歹得出门。
+    </p>
+  </div>
+</section>
+
+<!-- ================= 鲁迅语录区 ================= -->
+<section id="luxun" class="relative py-28 px-6 bg-paper text-ink paper-grain">
+  <div class="max-w-5xl mx-auto">
+
+    <!-- 章节标题（纸面配色反转） -->
+    <div class="reveal flex items-center gap-4 mb-6">
+      <span class="font-serif font-black text-6xl md:text-8xl text-ink/10 leading-none select-none">贰</span>
+      <div>
+        <p class="text-blood font-mono text-sm tracking-widest mb-2">CHAPTER 02 · HE SAID IT FIRST</p>
+        <h2 class="font-serif font-black text-3xl md:text-5xl tracking-wider">先生早说过了</h2>
+      </div>
+    </div>
+    <p class="reveal font-serif text-ink/60 mb-16 md:pl-24">一百年前的药方，今天拿出来，对症。</p>
+
+    <!-- 语录卡片：名言（黑底红字大版式）+ 现代吐槽对照（白底） -->
+    <div class="space-y-16">
+
+      <!-- 语录 1 -->
+      <article class="reveal">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-3xl md:text-5xl leading-snug">
+            "从来如此，<span class="text-blood">便对么？</span>"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《狂人日记》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>加班如此，团建如此，团播也如此。
+            你问凭什么，答曰"行业惯例"。再问，答曰"大家都是这样的"。
+          </p>
+        </div>
+      </article>
+
+      <!-- 语录 2 -->
+      <article class="reveal md:ml-16">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-2xl md:text-4xl leading-relaxed">
+            "人类的悲欢并不相通，<br>我只觉得他们<span class="text-blood">吵闹</span>。"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《小杂感》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>屏幕里的人笑得撕心裂肺，屏幕外的人刷着"哈哈哈哈"。
+            悲欢不相通，流量相通。
+          </p>
+        </div>
+      </article>
+
+      <!-- 语录 3 -->
+      <article class="reveal">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-2xl md:text-4xl leading-relaxed">
+            "群众，永远是戏剧的<span class="text-blood">看客</span>。"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《娜拉走后怎样》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>有人在台上受苦，有人在台下刷礼物解锁新惩罚，
+            看完就走，顺手点了个关注。
+          </p>
+        </div>
+      </article>
+
+      <!-- 语录 4 -->
+      <article class="reveal md:ml-16">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-xl md:text-3xl leading-relaxed">
+            "悲剧将人生的有价值的东西<span class="text-blood">毁灭</span>给人看，<br>
+            喜剧将那无价值的<span class="text-blood">撕破</span>给人看。"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《再论雷峰塔的倒掉》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>那直播间里循环上演的，到底是悲剧还是喜剧？
+            分不清。反正都在演，反正都有人看。
+          </p>
+        </div>
+      </article>
+
+      <!-- 语录 5 -->
+      <article class="reveal">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-2xl md:text-4xl leading-relaxed">
+            "时间就是性命。无端的空耗别人的时间，<br>
+            其实是无异于<span class="text-blood">谋财害命</span>。"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《门外文谈》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>一场四小时的团播，三千人观看——
+            相当于谋杀了一万两千个小时的性命。建议算法自首。
+          </p>
+        </div>
+      </article>
+
+      <!-- 语录 6 -->
+      <article class="reveal md:ml-16">
+        <div class="bg-ink text-paper p-8 md:p-10 woodcut-shadow relative">
+          <p class="font-serif font-black text-3xl md:text-5xl leading-snug">
+            "不在沉默中<span class="text-blood">爆发</span>，<br>就在沉默中<span class="text-blood">灭亡</span>。"
+          </p>
+          <p class="font-sans text-paper/40 text-sm mt-6 text-right">——《记念刘和珍君》</p>
+        </div>
+        <div class="border-l-4 border-warn pl-5 mt-4 md:ml-6">
+          <p class="font-sans text-ink/70 leading-relaxed">
+            <span class="font-bold text-blood">【今日对照】</span>主播沉默，会掉在线人数；
+            观众沉默，会被踢出直播间。那……我们在哪儿爆发？
+          </p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 酷刑图鉴 ================= -->
+<section id="gallery" class="relative py-28 px-6">
+  <div class="max-w-6xl mx-auto">
+
+    <!-- 章节标题 -->
+    <div class="reveal flex items-center gap-4 mb-6">
+      <span class="font-serif font-black text-6xl md:text-8xl text-paper/10 leading-none select-none">叁</span>
+      <div>
+        <p class="text-blood font-mono text-sm tracking-widest mb-2">CHAPTER 03 · THE GALLERY</p>
+        <h2 class="font-serif font-black text-3xl md:text-5xl tracking-wider">现代酷刑图鉴<span class="text-paper/40 text-lg md:text-2xl font-normal">（自愿版）</span></h2>
+      </div>
+    </div>
+    <p class="reveal font-serif text-paper/50 mb-16 md:pl-24">以下条目如有雷同——请自行对号入座。</p>
+
+    <!-- 副篇一：本门大师兄（团播本播） -->
+    <div class="reveal mb-8 flex items-center gap-4">
+      <span class="h-px flex-1 bg-blood/30"></span>
+      <h3 class="font-serif font-black text-2xl md:text-3xl tracking-wider whitespace-nowrap">
+        本门大师兄<span class="text-blood text-base md:text-lg font-normal">·团播</span>
+      </h3>
+      <span class="h-px flex-1 bg-blood/30"></span>
+    </div>
+
+    <!-- 图鉴卡片网格 -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+      <!-- 卡片 1：笑容 KPI -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">一</div>
+        <i data-lucide="smile" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">笑容 KPI</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">每小时微笑不低于 N 次，露齿八颗，眼神要有光。
+          想哭？可以，哭也有流量，哭完记得补妆。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★☆☆</p>
+      </div>
+
+      <!-- 卡片 2：惩罚经济学 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">二</div>
+        <i data-lucide="coins" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">惩罚经济学</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">输了吃芥末、淋冰水、做俯卧撑。
+          看客打赏即可解锁新姿势——你的痛苦，明码标价，童叟无欺。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+
+      <!-- 卡片 3：剧本互撕 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">三</div>
+        <i data-lucide="drama" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">剧本互撕</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">今天她哭了，明天她道歉，后天她们和好如初。
+          编剧写好，导演喊卡，眼泪按滴收费，反转按集结算。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★☆☆</p>
+      </div>
+
+      <!-- 卡片 4：全天候待机 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">四</div>
+        <i data-lucide="moon-star" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">全天候待机</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">凌晨三点："还有没睡的家人们吗？"
+          有。算法永远不睡，所以你也不许睡。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+
+      <!-- 卡片 5：数据鞭子 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">五</div>
+        <i data-lucide="trending-down" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">数据鞭子</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">在线人数掉了一位数？加播两小时。
+          数据不会说话，但数据会抽人，鞭鞭见血。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★★</p>
+      </div>
+
+      <!-- 卡片 6：感恩训练 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">六</div>
+        <i data-lucide="heart-handshake" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">感恩训练</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">感谢大哥，感谢平台，感谢家人们。
+          感谢到最后，唯一忘了感谢的，是还在硬撑的自己。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+    </div>
+
+    <!-- 副篇二：同门师兄弟（团播之外的现代酷刑） -->
+    <div class="reveal mt-24 mb-6 flex items-center gap-4">
+      <span class="h-px flex-1 bg-blood/30"></span>
+      <h3 class="font-serif font-black text-2xl md:text-3xl tracking-wider whitespace-nowrap">
+        同门师兄弟<span class="text-paper/40 text-base md:text-lg font-normal">——酷刑不止团播一家</span>
+      </h3>
+      <span class="h-px flex-1 bg-blood/30"></span>
+    </div>
+    <p class="reveal font-serif text-paper/50 mb-12 text-center">
+      你以为团播是独一份？不，它只是这个门派里最出名的。师兄弟们早就潜伏在你的工位上、酒桌边、朋友圈里。
+    </p>
+
+    <!-- 图鉴卡片网格（第二辑） -->
+    <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+      <!-- 卡片 7：年会献艺 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">七</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="party-popper" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">年会献艺</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">部门出节目，人人是演员。不会跳舞的程序员也得硬着头皮上台，
+          台下老板笑得像看角斗的皇帝——鼓掌最起劲的那位，年终奖已到账。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+
+      <!-- 卡片 8：强制团建 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">八</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="mountain" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">强制团建</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">占用周末爬山，美其名曰"增进感情"。感情增没增进不知道，
+          膝盖先报废了。报名表上印着"自愿参加"，落款是老板的深情注视。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★☆☆</p>
+      </div>
+
+      <!-- 卡片 9：酒桌文化 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">九</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="wine" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">酒桌文化</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">"我干了，您随意"——哪里有什么随意，杯沿一碰，
+          你的肝就签了卖身契。喝倒算诚意，喝吐算敬业，看客举着手机等你出丑。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★★</p>
+      </div>
+
+      <!-- 卡片 10：晨会口号 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="volume-2" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">晨会口号</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">清晨八点，店门口列队跳操、高喊口号，路人纷纷侧目。
+          口号喊得越响，时薪越配不上嗓子。罗马奴隶好歹不用领喊"我是最棒的"。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★☆☆</p>
+      </div>
+
+      <!-- 卡片 11：恶俗破冰 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十一</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="snowflake" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">恶俗破冰</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">新人入职第一课：当众表演才艺、回答羞耻问题、
+          和陌生人做"亲密"游戏。美其名曰破冰——碎的其实是你的尊严。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+
+      <!-- 卡片 12：周报文学 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十二</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="file-text" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">周报文学</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">三行的工作量，三千字的气势。"赋能""抓手""闭环"轮番上阵。
+          写给老板看，老板不看，但必须写——一种行为艺术。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★☆☆☆</p>
+      </div>
+
+      <!-- 卡片 13：表演式加班 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十三</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-warn/60 text-warn px-2 py-0.5 mb-4">职场系</span>
+        <i data-lucide="hourglass" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">表演式加班</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">活儿六点干完了，人九点才敢走。老板不走，我不走；
+          工位是新的斗兽场，看客是还没下班的领导，表演项目名叫"忙碌"。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+
+      <!-- 卡片 14：朋友圈营业 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十四</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-neon/60 text-neon px-2 py-0.5 mb-4">社交系</span>
+        <i data-lucide="share-2" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">朋友圈营业</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">转发公司文案配三颗爱心，修图两小时配文"生活明朗"。
+          人人都在朋友圈营业，活成别人期待的样子——上一条真实动态，停在三年前。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★☆☆</p>
+      </div>
+
+      <!-- 卡片 15：相亲角挂牌 -->
+      <div class="reveal group border-2 border-paper/20 p-7 hover:border-blood hover:-translate-y-2 transition-all duration-300 bg-ink relative overflow-hidden">
+        <div class="absolute -right-4 -top-4 text-paper/5 font-serif font-black text-8xl select-none">十五</div>
+        <span class="inline-block font-mono text-[10px] tracking-[0.3em] border border-blood/60 text-blood px-2 py-0.5 mb-4">人情系</span>
+        <i data-lucide="tag" class="w-9 h-9 text-blood mb-5"></i>
+        <h3 class="font-serif font-black text-xl mb-3 tracking-wider">相亲角挂牌</h3>
+        <p class="text-paper/60 text-sm leading-relaxed">学历、房产、户口明码标价，A4 纸往地上一铺，父母替你吆喝。
+          人还没到场，就先被围观、比价、挑拣——和牲口市集的区别，只差一杆秤。</p>
+        <p class="font-mono text-neon text-xs mt-5">// 酷刑等级：★★★★☆</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 交互：自愿指数检测 ================= -->
+<section id="test" class="relative py-28 px-6 border-y-2 border-blood/30 bg-gradient-to-b from-ink to-blooddark/10">
+  <div class="max-w-3xl mx-auto text-center">
+
+    <!-- 章节标题 -->
+    <div class="reveal mb-6">
+      <p class="text-blood font-mono text-sm tracking-widest mb-3">CHAPTER 04 · SELF CHECK</p>
+      <h2 class="font-serif font-black text-3xl md:text-5xl tracking-wider">团播自愿指数检测</h2>
+    </div>
+    <p class="reveal font-serif text-paper/50 mb-14">拖动滑块，诚实地告诉我：你现在到哪个阶段了？</p>
+
+    <!-- 检测卡片 -->
+    <div class="reveal bg-ink border-2 border-paper/20 p-10 md:p-14 woodcut-shadow">
+      <!-- 当前指数大数字 -->
+      <div class="font-mono font-black text-7xl md:text-8xl text-blood leading-none mb-2">
+        <span id="volunteer-value">0</span><span class="text-2xl text-paper/40">%</span>
+      </div>
+      <p class="font-sans text-xs tracking-[0.4em] text-paper/40 mb-10">VOLUNTARY INDEX · 自愿指数</p>
+
+      <!-- 滑块本体 -->
+      <input id="volunteer-slider" type="range" min="0" max="100" value="0" class="w-full mb-10"
+             aria-label="自愿指数滑块">
+
+      <!-- 刻度标签 -->
+      <div class="flex justify-between font-mono text-[10px] text-paper/30 mb-10">
+        <span>打死不去</span><span>身体不适</span><span>就这一次</span><span>还挺好玩</span><span>家人们</span><span>真的自愿</span>
+      </div>
+
+      <!-- 诊断结果输出 -->
+      <div id="verdict-box" class="bg-blood/10 border border-blood/40 p-6 md:p-8 text-left">
+        <p class="font-mono text-blood text-xs tracking-widest mb-3">// 诊断结果</p>
+        <p id="verdict-title" class="font-serif font-black text-xl md:text-2xl mb-2">"打死不去"</p>
+        <p id="verdict-desc" class="font-sans text-paper/60 text-sm leading-relaxed">恭喜，你还有救。请继续保持这种珍贵的、健康的、正常人该有的抵触情绪。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 结尾：炬火 ================= -->
+<section class="relative py-32 px-6">
+  <div class="max-w-4xl mx-auto text-center">
+
+    <!-- 空心大字装饰 -->
+    <p class="reveal quote-outline font-serif font-black text-5xl md:text-7xl tracking-widest mb-14 select-none">此后如竟没有炬火</p>
+
+    <!-- 结尾引文 -->
+    <blockquote class="reveal">
+      <p class="font-serif text-lg md:text-2xl leading-loose md:leading-loose text-paper/85">
+        "愿中国青年都摆脱冷气，只是向上走，不必听自暴自弃者流的话。<br>
+        能做事的做事，能发声的发声。<br>
+        有一分热，发一分光，就令萤火一般，<br>
+        也可以在黑暗里发一点光，<span class="text-blood font-black">不必等候炬火</span>。"
+      </p>
+      <footer class="mt-8 font-sans text-paper/40 text-sm">—— 鲁迅《热风 · 随感录四十一》</footer>
+    </blockquote>
+
+    <!-- 结语 -->
+    <p class="reveal font-serif text-paper/60 mt-14 leading-loose max-w-2xl mx-auto">
+      吐槽不是终点。下次再有人问"这和斗兽场有什么区别"——<br>
+      希望你不是在弹幕里回答的那个人，<br>
+      而是关掉直播、走出看台、把时间还给自己的人。
+    </p>
+
+    <!-- 印章收尾 -->
+    <div class="reveal mt-14 flex justify-center">
+      <div class="seal text-lg">谢绝围观</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 页脚 ================= -->
+<footer class="hazard-stripes h-3 w-full"></footer>
+<footer class="bg-ink border-t border-paper/10 py-10 px-6">
+  <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-paper/35 font-sans">
+    <p>数字斗兽场 · 吐槽特辑 —— 纯属个人情绪产物，不针对任何平台、公司或个人。</p>
+    <p class="font-mono">如有雷同，请自行对号入座 · <span class="text-blood">关掉直播，去晒太阳吧</span></p>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   脚本一：背景弹幕生成器
+   —— 飘过的都是直播间里最典型的"看客语录"，
+      营造被围观感，与页面主题互为讽刺。
+   ============================================================ */
+(function initDanmaku() {
+  const layer = document.getElementById('danmaku-layer');
+  // 典型直播间弹幕语料（看客语录精选）
+  const POOL = [
+    '哈哈哈哈哈哈哈哈哈', '主播再来一个！', '输了输了！惩罚！惩罚！',
+    '大哥威武！', '666666666', '快哭了快哭了，再逗一下',
+    '刷个火箭让他们跳一个', '爱看看不看滚！', '哈哈哈哈这也太惨了',
+    '关注了关注了', '主播别哭，哭也有流量', '再来一遍！再来一遍！',
+    '这个惩罚力度不够', '家人们把"惨"打在公屏上', '蹲一个反转',
+    '加播！加播！', '笑死我了', '老板说加两小时', '他们真的自愿的',
+    '古罗马人看了都说内行', '兄弟们这波血赚'
+  ];
+  // 弹幕配色：白为主，偶发血红 / 荧光绿，模拟真实弹幕密度
+  const COLORS = ['rgba(245,240,230,.30)', 'rgba(245,240,230,.30)', 'rgba(225,29,72,.45)', 'rgba(74,222,128,.35)'];
+
+  /**
+   * 生成一条弹幕：随机文本、随机轨道高度、随机时长，
+   * 动画结束后自我销毁，避免 DOM 无限膨胀。
+   */
+  function spawn() {
+    const el = document.createElement('span');
+    el.className = 'danmaku';
+    el.textContent = POOL[Math.floor(Math.random() * POOL.length)];
+    el.style.top = (4 + Math.random() * 88) + 'vh';              // 随机纵向轨道
+    el.style.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    el.style.fontSize = (13 + Math.random() * 10) + 'px';        // 随机字号
+    const duration = 14 + Math.random() * 18;                    // 随机漂移时长（秒）
+    el.style.animation = `danmaku-move ${duration}s linear forwards`;
+    layer.appendChild(el);
+    // 动画播完后移除节点
+    setTimeout(() => el.remove(), duration * 1000 + 200);
+  }
+
+  // 先铺一波，再按随机间隔持续生成（弹幕永不停息，正如算法）
+  for (let i = 0; i < 8; i++) setTimeout(spawn, i * 700);
+  setInterval(spawn, 1600);
+})();
+
+/* ============================================================
+   脚本二：在线人数模拟器
+   —— 让导航栏的"看客在线"数字上下波动，
+      讽刺直播间对在线人数的病态关注。
+   ============================================================ */
+(function initOnlineCounter() {
+  const el = document.getElementById('online-count');
+  let current = 12847; // 初始在线人数
+  setInterval(() => {
+    // 随机 ±120 波动，偶发一波"大哥进场"式的暴涨
+    const drift = Math.floor((Math.random() - 0.48) * 240);
+    current = Math.max(9999, current + drift);
+    el.textContent = current.toLocaleString();
+  }, 2000);
+})();
+
+/* ============================================================
+   脚本三：滚动浮现动画（IntersectionObserver）
+   —— 所有 .reveal 元素进入视口时加 .on 类触发过渡。
+   ============================================================ */
+(function initReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('on');
+        observer.unobserve(e.target); // 只触发一次，离开后不撤销
+      }
+    });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+})();
+
+/* ============================================================
+   脚本四：自愿指数滑块
+   —— 根据滑块值输出对应的"诊断结果"，
+      从"打死不去"一路滑向"完成角斗士蜕变"。
+   ============================================================ */
+(function initVolunteerSlider() {
+  const slider = document.getElementById('volunteer-slider');
+  const valueEl = document.getElementById('volunteer-value');
+  const titleEl = document.getElementById('verdict-title');
+  const descEl = document.getElementById('verdict-desc');
+
+  // 阶段配置表：按区间给出标题与吐槽描述
+  const STAGES = [
+    { max: 15,  title: '"打死不去"',
+      desc: '恭喜，你还有救。请继续保持这种珍贵的、健康的、正常人该有的抵触情绪。' },
+    { max: 35,  title: '"我身体不太舒服"',
+      desc: '借口库存即将告急。温馨提示：下一个借口"家里有事"已在候补名单上。' },
+    { max: 55,  title: '"就这一次，下不为例"',
+      desc: '经典剧本。据不完全统计，"这一次"通常每周期发生一次，永不例外。' },
+    { max: 75,  title: '"其实还挺好玩的（老板在身后）"',
+      desc: '警告：你已经开始配合演出了。检测到话术正在写入记忆，请立即撤离直播间。' },
+    { max: 90,  title: '"家人们！点点关注！"',
+      desc: '话术已刻进 DNA。你开始在其他视频下打"哈哈哈哈"，且不再觉得有什么不对。' },
+    { max: 100, title: '"我真的自愿"',
+      desc: '恭喜完成终极蜕变：从人类到角斗士。罗马皇帝对你的敬业精神表示欣慰，并批注：此人无需锁链。' }
+  ];
+
+  function update() {
+    const v = +slider.value;
+    valueEl.textContent = v;
+    // 用 CSS 变量驱动滑块已滑过部分变红
+    slider.style.setProperty('--fill', v + '%');
+    // 命中对应阶段
+    const stage = STAGES.find(s => v <= s.max) || STAGES[STAGES.length - 1];
+    titleEl.textContent = stage.title;
+    descEl.textContent = stage.desc;
+  }
+
+  slider.addEventListener('input', update);
+  update(); // 初始化渲染一次
+})();
+
+/* ============================================================
+   脚本五：Lucide 图标初始化（必须在 DOM 就绪后调用）
+   ============================================================ */
+lucide.createIcons();
+</script>
+</body>
+</html>
